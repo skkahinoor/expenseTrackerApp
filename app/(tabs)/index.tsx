@@ -1,432 +1,575 @@
+import { COLORS } from "@/constants/theme";
+import Avatar from "@/components/Avatar";
 import { useAuth } from "@/context/AuthContext";
+import { useBanks } from "@/context/BankContext";
 import { useExpenses } from "@/context/ExpenseContext";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import React, { useMemo } from "react";
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-const QUICK_ACTIONS = [
-  {
-    icon: "add-circle-outline",
-    label: "Add Expense",
-    color: "#6366f1",
-    route: "/add",
-  },
-  {
-    icon: "receipt-outline",
-    label: "Expenses",
-    color: "#10b981",
-    route: "/expenses",
-  },
-  {
-    icon: "bar-chart-outline",
-    label: "Reports",
-    color: "#ec4899",
-    route: "/reports",
-  },
-  {
-    icon: "person-outline",
-    label: "Profile",
-    color: "#f59e0b",
-    route: "/profile",
-  },
-];
+const { width } = Dimensions.get("window");
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
-  const { expenses, isLoading, totalSpent, refresh } = useExpenses();
+  const { user, fullData, refreshFullData } = useAuth();
+  const {
+    expenses,
+    isLoading: expLoading,
+    totalSpent,
+    refresh: refreshExp,
+  } = useExpenses();
+  const { banks, isLoading: bankLoading, refresh: refreshBanks } = useBanks();
   const router = useRouter();
 
-  const salary = parseFloat(user?.salary || "0");
-  const savingGoal = parseFloat(user?.saving_goal || "0");
-  const remaining = salary - totalSpent;
-  const savingProgress = Math.min((totalSpent / salary) * 100, 100);
+  const settings: any = fullData?.settings || fullData?.user || user || {};
+
+  const salary = parseFloat(settings.salary || "0");
+  const savingGoal = parseFloat(
+    settings.savingGoal || settings.saving_goal || "0",
+  );
+  const fixedExpenses = parseFloat(
+    settings.fixedExpenses || settings.fixed_expenses || "0",
+  );
+
+  const variablePool = salary - savingGoal - fixedExpenses;
+  const budgetLeft = variablePool - totalSpent;
+  const consumptionPerc = Math.min((totalSpent / variablePool) * 100, 100);
+
+  const daysInMonth = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth() + 1,
+    0,
+  ).getDate();
+  const currentDay = new Date().getDate();
+  const remainingDays = Math.max(daysInMonth - currentDay + 1, 1);
+
+  const safeDailyLimit = variablePool / 30;
+  const actionableToday = Math.max(budgetLeft / remainingDays, 0);
 
   const firstName = user?.name?.split(" ")[0] || "User";
+  const todayStr = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
-  const recentTransactions = useMemo(() => {
-    return expenses.slice(0, 5);
+  const refresh = async () => {
+    await refreshFullData();
+  };
+
+  const getBankName = (id: number) =>
+    banks.find((b) => b.id === id)?.name || "Unknown Bank";
+
+  const recentExpenses = useMemo(() => {
+    return expenses
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, 5);
   }, [expenses]);
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "Food & Dining":
-        return "#f59e0b";
-      case "Transportation":
-        return "#6366f1";
-      case "Shopping":
-        return "#ec4899";
-      case "Bills & Utilities":
-        return "#ef4444";
-      default:
-        return "#10b981";
-    }
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case "Food & Dining":
-        return "fast-food-outline";
-      case "Transportation":
-        return "car-outline";
-      case "Shopping":
-        return "cart-outline";
-      case "Bills & Utilities":
-        return "receipt-outline";
-      default:
-        return "list-outline";
-    }
-  };
+  const categorySummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    expenses.forEach((e) => {
+      counts[e.category] = (counts[e.category] || 0) + e.amount;
+    });
+    return Object.entries(counts)
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+  }, [expenses]);
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+
+      {/* Header Section */}
+      <View style={[styles.header, { paddingHorizontal: 20, paddingTop: 60 }]}>
+        <View>
+          <Text style={styles.greetingText}>Hi, {firstName}</Text>
+          <Text style={styles.dateSubtext}>
+            {todayStr}
+            {"\n"}₹{Math.max(budgetLeft, 0).toLocaleString()} available
+          </Text>
+        </View>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity style={styles.bellIcon}>
+            <Ionicons name="notifications" size={20} color={COLORS.accent} />
+            <View style={styles.pingBadge} />
+          </TouchableOpacity>
+          <Avatar user={user} size={44} />
+        </View>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
+            refreshing={expLoading || bankLoading}
             onRefresh={refresh}
-            tintColor="#6366f1"
+            tintColor={COLORS.accent}
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Good day,</Text>
-            <Text style={styles.userName}>{firstName} 👋</Text>
-          </View>
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-            <Ionicons name="log-out-outline" size={22} color="#94a3b8" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Balance Card */}
-        <View style={styles.balanceCard}>
-          <View style={styles.balanceCardInner}>
-            <Text style={styles.balanceLabel}>Monthly Salary</Text>
-            <Text style={styles.balanceAmount}>
-              ₹{salary.toLocaleString("en-IN")}
+        {/* Global Variable Pool Card */}
+        <View style={styles.poolCard}>
+          <BlurView intensity={20} tint="dark" style={styles.poolInner}>
+            <View style={styles.poolBadge}>
+              <View style={styles.poolDot} />
+              <Text style={styles.poolBadgeText}>VARIABLE POOL</Text>
+            </View>
+            <Text style={styles.poolAmount}>
+              ₹{Math.max(budgetLeft, 0).toLocaleString()}
             </Text>
-            <View style={styles.balanceRow}>
-              <View style={styles.balanceStat}>
-                <Ionicons name="wallet-outline" size={16} color="#10b981" />
-                <Text style={styles.balanceStatLabel}>Remaining</Text>
-                <Text style={[styles.balanceStatValue, { color: "#10b981" }]}>
-                  ₹{remaining.toLocaleString("en-IN")}
+            <Text style={styles.poolSubtext}>
+              After savings & fixed bills · Mar 2026
+            </Text>
+
+            <View style={styles.budgetProgressRow}>
+              <Text style={styles.progressLabel}>
+                Budget consumed this month
+              </Text>
+              <Text style={styles.progressValue}>
+                {consumptionPerc.toFixed(0)}%
+              </Text>
+            </View>
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${consumptionPerc}%` },
+                ]}
+              />
+            </View>
+
+            <View style={styles.splitLimitRow}>
+              <View style={[styles.limitBox, { backgroundColor: "#1e293b" }]}>
+                <Text style={styles.limitLabel}>SAFE DAILY</Text>
+                <Text style={styles.limitValue}>
+                  ₹{safeDailyLimit.toFixed(0)}
                 </Text>
               </View>
-              <View style={styles.balanceDivider} />
-              <View style={styles.balanceStat}>
-                <Ionicons
-                  name="trending-down-outline"
-                  size={16}
-                  color="#f87171"
-                />
-                <Text style={styles.balanceStatLabel}>Spent</Text>
-                <Text style={[styles.balanceStatValue, { color: "#f87171" }]}>
-                  ₹{totalSpent.toLocaleString("en-IN")}
+              <View
+                style={[
+                  styles.limitBox,
+                  {
+                    backgroundColor: "rgba(245, 158, 11, 0.08)",
+                    borderColor: "rgba(245, 158, 11, 0.2)",
+                    borderWidth: 1,
+                  },
+                ]}
+              >
+                <View style={styles.actionableHeader}>
+                  <Ionicons name="flash" size={12} color={COLORS.accent} />
+                  <Text
+                    style={[
+                      styles.limitLabel,
+                      { color: COLORS.accent, marginLeft: 4 },
+                    ]}
+                  >
+                    ACTIONABLE TODAY
+                  </Text>
+                </View>
+                <Text style={[styles.limitValue, { color: COLORS.accent }]}>
+                  ₹{actionableToday.toFixed(0)}
                 </Text>
               </View>
             </View>
-          </View>
+          </BlurView>
         </View>
 
-        {/* Saving Goal */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Budget Usage</Text>
-            <Text style={styles.sectionMeta}>
-              Salary: ₹{salary.toLocaleString("en-IN")}
-            </Text>
-          </View>
-          <View style={styles.progressBg}>
+        {/* Categories Breakdown Section */}
+        <View style={styles.breakdownCard}>
+          <View
+            style={[
+              styles.donutPlaceholder,
+              {
+                borderTopColor:
+                  consumptionPerc > 5 ? COLORS.primary : COLORS.border,
+                borderRightColor:
+                  consumptionPerc > 25 ? COLORS.primary : COLORS.border,
+                borderBottomColor:
+                  consumptionPerc > 50 ? COLORS.primary : COLORS.border,
+                borderLeftColor:
+                  consumptionPerc > 75 ? COLORS.primary : COLORS.border,
+                transform: [{ rotate: "45deg" }], // Rotate so top starts at 0 visually inside the curve
+              },
+            ]}
+          >
             <View
-              style={[styles.progressFill, { width: `${savingProgress}%` }]}
-            />
+              style={{
+                transform: [{ rotate: "-45deg" }],
+                alignItems: "center",
+              }}
+            >
+              <Text style={styles.donutCenterValue}>
+                ₹{(totalSpent / 1000).toFixed(0)}K
+              </Text>
+              <Text style={styles.donutCenterLabel}>SPENT</Text>
+            </View>
           </View>
-          <Text style={styles.progressLabel}>
-            {savingProgress.toFixed(1)}% of salary spent
-          </Text>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActions}>
-            {QUICK_ACTIONS.map((action) => (
-              <TouchableOpacity
-                key={action.label}
-                style={styles.quickAction}
-                activeOpacity={0.75}
-                onPress={() => router.push(action.route as any)}
-              >
+          <View style={styles.legendContainer}>
+            {categorySummary.map((cat, i) => (
+              <View key={cat.name} style={styles.legendItem}>
                 <View
                   style={[
-                    styles.quickActionIcon,
-                    { backgroundColor: action.color + "22" },
+                    styles.legendDot,
+                    {
+                      backgroundColor: Object.values(COLORS.categories)[i % 5],
+                    },
                   ]}
-                >
-                  <Ionicons
-                    name={action.icon as any}
-                    size={22}
-                    color={action.color}
-                  />
-                </View>
-                <Text style={styles.quickActionLabel}>{action.label}</Text>
-              </TouchableOpacity>
+                />
+                <Text style={styles.legendName} numberOfLines={1}>
+                  {cat.name}
+                </Text>
+                <Text style={styles.legendAmount}>
+                  ₹{cat.amount.toLocaleString()}
+                </Text>
+              </View>
             ))}
           </View>
         </View>
 
-        {/* Recent Transactions */}
+        {/* Today's Transactions */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Transactions</Text>
+            <Text style={styles.sectionTitle}>TODAY'S TRANSACTIONS</Text>
             <TouchableOpacity onPress={() => router.push("/expenses")}>
-              <Text style={styles.seeAll}>See all</Text>
+              <Text style={styles.seeAllText}>See all →</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.transactionList}>
-            {isLoading && expenses.length === 0 ? (
-              <ActivityIndicator color="#6366f1" style={{ padding: 20 }} />
-            ) : recentTransactions.length > 0 ? (
-              recentTransactions.map((tx) => (
-                <View key={tx.id} style={styles.transactionItem}>
-                  <View
-                    style={[
-                      styles.txIcon,
-                      { backgroundColor: getCategoryColor(tx.category) + "22" },
-                    ]}
-                  >
-                    <Ionicons
-                      name={getCategoryIcon(tx.category) as any}
-                      size={20}
-                      color={getCategoryColor(tx.category)}
-                    />
-                  </View>
-                  <View style={styles.txInfo}>
-                    <Text style={styles.txLabel}>
-                      {tx.description || tx.category}
-                    </Text>
-                    <Text style={styles.txDate}>{tx.date}</Text>
-                  </View>
-                  <Text style={styles.txAmount}>
-                    -₹{tx.amount.toLocaleString("en-IN")}
+            {recentExpenses.map((ex) => (
+              <View key={ex.id} style={styles.txItem}>
+                <View style={styles.txIconBox}>
+                  <Ionicons
+                    name="receipt-outline"
+                    size={20}
+                    color={COLORS.text}
+                  />
+                </View>
+                <View style={styles.txInfo}>
+                  <Text style={styles.txTitle}>
+                    {ex.description || ex.category}
+                  </Text>
+                  <Text style={styles.txSub}>
+                    {ex.category} · {getBankName(ex.bank_id)}
                   </Text>
                 </View>
-              ))
-            ) : (
-              <Text style={styles.emptyText}>No recent transactions</Text>
-            )}
+                <View style={styles.txRight}>
+                  <Text style={styles.txAmount}>
+                    -₹{ex.amount.toLocaleString()}
+                  </Text>
+                  <Text style={styles.txTime}>12:34 PM</Text>
+                </View>
+              </View>
+            ))}
           </View>
         </View>
+
+        {/* Your Accounts Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>YOUR ACCOUNTS</Text>
+            <TouchableOpacity onPress={() => router.push("/banks")}>
+              <Text style={styles.seeAllText}>Manage →</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.bankCarousel}
+          >
+            {banks.map((bank, i) => (
+              <TouchableOpacity
+                key={bank.id}
+                style={[
+                  styles.bankCard,
+                  {
+                    borderColor:
+                      i % 2 === 0
+                        ? "rgba(59, 130, 246, 0.2)"
+                        : "rgba(16, 185, 129, 0.2)",
+                  },
+                ]}
+                onPress={() => router.push("/banks")}
+              >
+                <Text style={styles.bankIdLabel}>{bank.name}</Text>
+                <Text style={styles.bankCardBalance}>
+                  ₹{parseFloat(bank.balance.toString()).toLocaleString()}
+                </Text>
+                <View
+                  style={[
+                    styles.bankTypeBadge,
+                    {
+                      backgroundColor:
+                        i % 2 === 0
+                          ? "rgba(59, 130, 246, 0.15)"
+                          : "rgba(16, 185, 129, 0.15)",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.bankTypeText,
+                      { color: i % 2 === 0 ? "#3b82f6" : "#10b981" },
+                    ]}
+                  >
+                    {bank.purpose?.toUpperCase() || "ACTIVE"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        <View style={{ height: 120 }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f172a",
-  },
-  scroll: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  scroll: { paddingHorizontal: 20, paddingTop: 10 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  greeting: {
+  greetingText: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: COLORS.text,
+    letterSpacing: -0.5,
+  },
+  dateSubtext: {
     fontSize: 13,
-    color: "#64748b",
-    fontWeight: "500",
+    color: COLORS.textMuted,
+    marginTop: 4,
+    fontWeight: "600",
   },
-  userName: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#f1f5f9",
-    marginTop: 2,
-  },
-  logoutBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1e293b",
+  headerIcons: { flexDirection: "row", alignItems: "center", gap: 15 },
+  bellIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#334155",
   },
-  balanceCard: {
-    borderRadius: 20,
-    marginBottom: 24,
+  pingBadge: {
+    position: "absolute",
+    top: 12,
+    right: 14,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.accent,
+    borderWidth: 2,
+    borderColor: COLORS.background,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  poolCard: {
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    borderRadius: 32,
     overflow: "hidden",
-    backgroundColor: "#6366f1",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.05)",
+    marginBottom: 25,
   },
-  balanceCardInner: {
-    padding: 22,
-  },
-  balanceLabel: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.7)",
-    fontWeight: "500",
-    marginBottom: 6,
-  },
-  balanceAmount: {
-    fontSize: 34,
-    fontWeight: "800",
-    color: "#fff",
-    marginBottom: 20,
-    letterSpacing: 0.5,
-  },
-  balanceRow: {
+  poolInner: { padding: 24 },
+  poolBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.15)",
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: "rgba(59, 130, 246, 0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+    marginBottom: 16,
   },
-  balanceStat: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
+  poolDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+    marginRight: 6,
   },
-  balanceDivider: {
-    width: 1,
-    height: 36,
-    backgroundColor: "rgba(255,255,255,0.2)",
+  poolBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: COLORS.primary,
+    letterSpacing: 0.8,
   },
-  balanceStatLabel: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.65)",
+  poolAmount: {
+    fontSize: 48,
+    fontWeight: "900",
+    color: COLORS.text,
+    letterSpacing: -1,
+  },
+  poolSubtext: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: 4,
     fontWeight: "500",
-    marginTop: 2,
   },
-  balanceStatValue: {
-    fontSize: 16,
-    fontWeight: "700",
+  budgetProgressRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 24,
+    marginBottom: 12,
   },
-  section: {
-    marginBottom: 28,
+  progressLabel: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600" },
+  progressValue: { fontSize: 12, fontWeight: "800", color: COLORS.primary },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 4,
+    overflow: "hidden",
   },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: COLORS.primary,
+    borderRadius: 4,
+  },
+  splitLimitRow: { flexDirection: "row", gap: 12, marginTop: 20 },
+  limitBox: { flex: 1, padding: 18, borderRadius: 20 },
+  actionableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  limitLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  limitValue: { fontSize: 24, fontWeight: "900", color: COLORS.text },
+  breakdownCard: {
+    flexDirection: "row",
+    backgroundColor: COLORS.surface,
+    borderRadius: 28,
+    padding: 24,
+    marginBottom: 30,
+    alignItems: "center",
+    gap: 20,
+  },
+  donutPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 8,
+    borderColor: COLORS.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  donutCenterValue: { fontSize: 18, fontWeight: "900", color: COLORS.text },
+  donutCenterLabel: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: "800",
+  },
+  legendContainer: { flex: 1, gap: 10 },
+  legendItem: { flexDirection: "row", alignItems: "center" },
+  legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
+  legendName: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
+  },
+  legendAmount: { fontSize: 12, fontWeight: "800", color: COLORS.text },
+  section: { marginBottom: 30 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#f1f5f9",
-  },
-  sectionMeta: {
     fontSize: 12,
-    color: "#64748b",
+    fontWeight: "800",
+    color: COLORS.textMuted,
+    letterSpacing: 1.2,
   },
-  seeAll: {
-    fontSize: 13,
-    color: "#6366f1",
+  seeAllText: { fontSize: 12, color: COLORS.primary, fontWeight: "700" },
+  transactionList: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 28,
+    padding: 10,
+  },
+  txItem: { flexDirection: "row", alignItems: "center", padding: 15 },
+  txIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  txInfo: { flex: 1, marginLeft: 16 },
+  txTitle: { fontSize: 15, fontWeight: "800", color: COLORS.text },
+  txSub: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+    fontWeight: "500",
+  },
+  txRight: { alignItems: "flex-end" },
+  txAmount: { fontSize: 15, fontWeight: "900", color: COLORS.danger },
+  txTime: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    marginTop: 4,
     fontWeight: "600",
   },
-  progressBg: {
-    height: 8,
-    backgroundColor: "#1e293b",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#6366f1",
-    borderRadius: 4,
-  },
-  progressLabel: {
-    fontSize: 12,
-    color: "#64748b",
-    marginTop: 8,
-  },
-  quickActions: {
-    flexDirection: "row",
+  bankCarousel: { gap: 15 },
+  bankCard: {
+    width: 180,
+    height: 110,
+    backgroundColor: COLORS.surface,
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1,
     justifyContent: "space-between",
   },
-  quickAction: {
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  quickActionIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  quickActionLabel: {
+  bankIdLabel: {
     fontSize: 11,
-    color: "#94a3b8",
-    fontWeight: "500",
-    textAlign: "center",
+    fontWeight: "800",
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
   },
-  transactionList: {
-    backgroundColor: "#1e293b",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#334155",
-    overflow: "hidden",
+  bankCardBalance: { fontSize: 22, fontWeight: "900", color: COLORS.text },
+  bankTypeBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
-  transactionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#0f172a",
-  },
-  txIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  txInfo: {
-    flex: 1,
-  },
-  txLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#f1f5f9",
-  },
-  txDate: {
-    fontSize: 12,
-    color: "#64748b",
-    marginTop: 2,
-  },
-  txAmount: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#f87171",
-  },
-  emptyText: {
-    color: "#64748b",
-    padding: 20,
-    textAlign: "center",
-  },
+  bankTypeText: { fontSize: 9, fontWeight: "900" },
 });

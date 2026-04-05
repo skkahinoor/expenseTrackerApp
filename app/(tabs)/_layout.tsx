@@ -1,75 +1,135 @@
-import { ExpenseProvider } from "@/context/ExpenseContext";
+import { COLORS } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
+import { Platform, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const TAB_BAR_HEIGHT =
+    (Platform.OS === "ios" ? 88 : 70) + Math.max(insets.bottom, 0);
+
   return (
-    <ExpenseProvider>
+    <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: "#1e293b",
-            borderTopColor: "#334155",
+            backgroundColor: "#020617",
+            borderTopColor: "rgba(255, 255, 255, 0.05)",
             borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 8,
-            paddingTop: 6,
+            height: TAB_BAR_HEIGHT,
+            paddingBottom:
+              Platform.OS === "ios" ? 30 : Math.max(insets.bottom + 10, 15),
+            paddingTop: 8,
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            elevation: 20,
+            overflow: "visible", // Fix for Android FAB clipping
           },
-          tabBarActiveTintColor: "#6366f1",
-          tabBarInactiveTintColor: "#475569",
+          tabBarActiveTintColor: COLORS.primary,
+          tabBarInactiveTintColor: COLORS.textMuted,
           tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: "600",
+            fontSize: 10,
+            fontWeight: "800",
+            marginTop: Platform.OS === "ios" ? 0 : 2,
           },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
-            title: "Dashboard",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home-outline" size={size} color={color} />
+            title: "Home",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="home" size={20} color={color} />
             ),
           }}
         />
         <Tabs.Screen
-          name="expenses"
+          name="banks"
           options={{
-            title: "Expenses",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="receipt-outline" size={size} color={color} />
+            title: "Banks",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="business" size={20} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="tasks"
+          options={{
+            title: "Tasks",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="checkbox" size={20} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="add"
           options={{
-            title: "Add",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="add-circle-outline" size={size} color={color} />
+            title: "",
+            tabBarLabel: () => null,
+            tabBarIcon: () => (
+              <View
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: 25,
+                  backgroundColor: COLORS.accent,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginTop: -15, // Lifted slightly
+                  shadowColor: COLORS.accent,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 8,
+                  borderWidth: 3,
+                  borderColor: COLORS.background,
+                }}
+              >
+                <Ionicons name="add" size={26} color="#fff" />
+              </View>
             ),
           }}
         />
         <Tabs.Screen
-          name="reports"
+          name="analytics"
           options={{
-            title: "Reports",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="bar-chart-outline" size={size} color={color} />
+            title: "Stats",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="stats-chart" size={20} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: "Settings",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="settings-sharp" size={20} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
-            title: "Profile",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person-outline" size={size} color={color} />
+            title: "User",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="person" size={20} color={color} />
             ),
           }}
         />
+        {/* Hidden internal routes */}
+        <Tabs.Screen
+          name="expenses"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
-    </ExpenseProvider>
+    </View>
   );
 }

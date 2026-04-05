@@ -1,4 +1,7 @@
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { BankProvider } from "@/context/BankContext";
+import { ExpenseProvider } from "@/context/ExpenseContext";
+import { TodoProvider } from "@/context/TodoContext";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
@@ -46,10 +49,20 @@ function RootLayoutNav() {
   );
 }
 
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <BankProvider>
+          <ExpenseProvider>
+            <TodoProvider>
+              <RootLayoutNav />
+            </TodoProvider>
+          </ExpenseProvider>
+        </BankProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
