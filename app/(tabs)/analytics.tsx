@@ -1,5 +1,6 @@
-import { COLORS } from "@/constants/theme";
+import { COLORS as THEME_COLORS } from "@/constants/theme";
 import Avatar from "@/components/Avatar";
+import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { Expense, useExpenses } from "@/context/ExpenseContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +26,7 @@ const { width } = Dimensions.get("window");
 export default function Analytics() {
   const { expenses, totalSpent, refresh, isLoading } = useExpenses();
   const { user, fullData } = useAuth();
+  const { colors: COLORS, theme } = useTheme();
 
   const settings: any = fullData?.settings || fullData?.user || user || {};
   const salary = parseFloat(settings.salary || "0");
@@ -320,10 +322,12 @@ export default function Analytics() {
     return "cart-outline";
   };
 
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   return (
     <View style={styles.container}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         translucent
         backgroundColor="transparent"
       />
@@ -391,7 +395,7 @@ export default function Analytics() {
               onPress={handleExportPdf}
               disabled={exportingPdf || rangeExpenses.length === 0}
             >
-              <Ionicons name="document-text-outline" size={16} color="#fff" />
+              <Ionicons name="document-text-outline" size={16} color={COLORS.text} />
               <Text style={styles.rangeExportText}>
                 {exportingPdf ? "Preparing..." : "Export PDF"}
               </Text>
@@ -672,7 +676,7 @@ export default function Analytics() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     paddingTop: 60,
@@ -718,10 +722,10 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   rangeInput: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: COLORS.surfaceLighter,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: COLORS.border,
     paddingHorizontal: 12,
     height: 44,
     color: COLORS.text,
@@ -743,7 +747,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 46,
     borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: COLORS.surfaceLighter,
     borderWidth: 1,
     borderColor: COLORS.border,
     alignItems: "center",
@@ -751,7 +755,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  rangeExportText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+  rangeExportText: { color: COLORS.text, fontWeight: "900", fontSize: 14 },
   rangeMeta: {
     fontSize: 12,
     color: COLORS.textSecondary,
@@ -927,10 +931,10 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   historyDayCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
+    backgroundColor: COLORS.surfaceLighter,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: COLORS.border,
     padding: 12,
     marginBottom: 12,
   },

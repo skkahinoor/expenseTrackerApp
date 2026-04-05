@@ -1,4 +1,5 @@
-import { COLORS } from "@/constants/theme";
+import { COLORS as THEME_COLORS } from "@/constants/theme";
+import { useTheme } from "@/context/ThemeContext";
 import { useExpenses } from "@/context/ExpenseContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -24,6 +25,7 @@ export default function Expenses() {
     deleteExpense,
     deleteTransfer,
   } = useExpenses();
+  const { colors: COLORS, theme } = useTheme();
   const router = useRouter();
 
   const allTransactions = useMemo(() => {
@@ -123,9 +125,11 @@ export default function Expenses() {
     );
   };
 
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color={COLORS.text} />
@@ -222,7 +226,7 @@ export default function Expenses() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     paddingTop: 60,

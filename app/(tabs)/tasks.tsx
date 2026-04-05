@@ -1,5 +1,6 @@
-import { COLORS } from "@/constants/theme";
+import { COLORS as THEME_COLORS } from "@/constants/theme";
 import Avatar from "@/components/Avatar";
+import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { useBanks } from "@/context/BankContext";
 import { useTodos } from "@/context/TodoContext";
@@ -29,6 +30,7 @@ export default function TasksScreen() {
   const { todos, isLoading, addTodo, toggleTodo, deleteTodo, refresh } =
     useTodos();
   const { user, logout } = useAuth();
+  const { colors: COLORS, theme } = useTheme();
   const { banks } = useBanks();
   const [modalVisible, setModalVisible] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -270,10 +272,12 @@ export default function TasksScreen() {
     );
   };
 
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   return (
     <View style={styles.container}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         translucent
         backgroundColor="transparent"
       />
@@ -322,7 +326,7 @@ export default function TasksScreen() {
               style={styles.addCardTop}
               onPress={() => setModalVisible(true)}
             >
-              <BlurView intensity={20} tint="light" style={styles.addCardBlur}>
+              <BlurView intensity={20} tint={theme === 'dark' ? 'dark' : 'light'} style={styles.addCardBlur}>
                 <View style={styles.addCardInner}>
                   <View style={styles.addIconBox}>
                     <Ionicons name="add" size={24} color="#fff" />
@@ -353,7 +357,7 @@ export default function TasksScreen() {
           style={styles.modalOverlay}
         >
           <View style={styles.modalContent}>
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={40} tint={theme === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
             <View style={styles.modalInner}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>New Smart Task</Text>
@@ -482,7 +486,7 @@ export default function TasksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     paddingTop: 60,

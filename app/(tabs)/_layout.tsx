@@ -1,5 +1,6 @@
-import { COLORS } from "@/constants/theme";
+import { COLORS as THEME_COLORS } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
 import { Tabs, useRouter } from "expo-router";
 import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors: COLORS, isDark } = useTheme();
   const TAB_BAR_HEIGHT =
     (Platform.OS === "ios" ? 88 : 70) + Math.max(insets.bottom, 0);
 
@@ -16,8 +18,8 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: "#020617",
-            borderTopColor: "rgba(255, 255, 255, 0.05)",
+            backgroundColor: COLORS.surface,
+            borderTopColor: COLORS.border,
             borderTopWidth: 1,
             height: TAB_BAR_HEIGHT,
             paddingBottom:

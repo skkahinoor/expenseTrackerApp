@@ -3,9 +3,10 @@ import Avatar from "@/components/Avatar";
 import CustomAlert from "@/components/CustomAlert";
 import { useAuth } from "@/context/AuthContext";
 import { useBanks } from "@/context/BankContext";
+import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     Alert,
     Dimensions,
@@ -22,8 +23,10 @@ import {
 } from "react-native";
 
 export default function Profile() {
-  const { user, logout, token, resetData, refreshUser } = useAuth();
+  const { user, logout, token, resetData, refreshUser, updateProfile, uploadProfilePic } = useAuth();
   const { banks, updateBank, refresh: refreshBanks } = useBanks();
+  const { theme, toggleTheme, colors: COLORS } = useTheme();
+  const isDark = theme === "dark";
   const [loading, setLoading] = useState(false);
   
   const [alertVisible, setAlertVisible] = useState(false);
@@ -59,50 +62,65 @@ export default function Profile() {
   const userPhone = uInfo.phone_number || "Add phone number";
   const userAddress = uInfo.address || "Add address";
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
+  const [imageSourceVisible, setImageSourceVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  const requestPermissions = async () => {
+    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+    const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
+      showAlert("Permission Denied", "We need camera and gallery permissions to update your profile picture.", "warning");
+      return false;
+    }
+    return true;
+  };
+
+  const pickImage = async (useCamera: boolean = false) => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    setImageSourceVisible(false);
+
+    let result;
+    if (useCamera) {
+      result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+      });
+    } else {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+      });
+    }
 
     if (!result.canceled) {
-      uploadImage(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setSelectedImage(uri);
+      
+      // If the edit modal is NOT open, we upload immediately like before
+      // But if it IS open, we'll save it when the user clicks 'Save Changes'
+      if (!editSheetVisible) {
+        uploadImage(uri);
+      }
     }
   };
 
   const uploadImage = async (uri: string) => {
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("profile_pic", {
-        uri,
-        name: "profile.jpg",
-        type: "image/jpeg",
-      } as any);
-
-      const res = await fetch(
-        `https://expensetrack.online/backend/public/api/user/profile-pic`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token || ""}`,
-            Accept: "application/json",
-          },
-          body: formData,
-        },
-      );
-
-      if (res.ok) {
-        if (refreshUser) await refreshUser();
-        Alert.alert("Success", "Profile picture updated!");
-      } else {
-        Alert.alert("Error", "Failed to update profile picture.");
+      if (uploadProfilePic) {
+        await uploadProfilePic(uri);
+        showAlert("Success", "Profile picture updated successfully!", "success");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert("Error", "Check your connection.");
+      showAlert("Error", e.message || "Failed to update profile picture.", "danger");
     } finally {
       setLoading(false);
     }
@@ -132,29 +150,34 @@ export default function Profile() {
     if (editSaving) return;
     setEditSaving(true);
     try {
-      const API_BASE = "https://expensetrack.online/backend/public/api";
-      await fetch(`${API_BASE}/user/profile`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token || ""}`,
-        },
-        body: JSON.stringify(editForm),
-      }).catch(() => {});
-      if (refreshUser) await refreshUser();
+      // 1. Update text info
+      await updateProfile(editForm);
+
+      // 2. If an image was selected in the edit modal, upload it now
+      if (selectedImage && uploadProfilePic) {
+        try {
+          await uploadProfilePic(selectedImage);
+        } catch (picErr) {
+          showAlert("Warning", "Profile details saved, but profile picture failed to upload.", "warning");
+        }
+      }
+
       setEditSheetVisible(false);
-      Alert.alert("Saved", "Profile details updated successfully.");
+      setSelectedImage(null);
+      showAlert("Profile Updated", "Your changes have been saved gracefully.", "success");
     } catch (e: any) {
-      Alert.alert("Error", e?.message || "Failed to save profile.");
+      showAlert("Error", e?.message || "Failed to save profile.", "danger");
     } finally {
       setEditSaving(false);
     }
   };
 
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   return (
     <View style={styles.container}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         translucent
         backgroundColor="transparent"
       />
@@ -180,14 +203,16 @@ export default function Profile() {
       >
         {/* Identity Section */}
         <View style={styles.identity}>
-          <Avatar user={user} size={120} onPress={pickImage}>
-            <View style={styles.cameraOverlay}>
-              <Ionicons name="camera" size={12} color="#fff" />
-            </View>
-          </Avatar>
-          <Text style={styles.userName}>{user?.name || "Aryan Sharma"}</Text>
+          <View style={styles.avatarWrapper}>
+            <Avatar user={user} size={120} onPress={() => setImageSourceVisible(true)}>
+              <View style={styles.cameraOverlay}>
+                <Ionicons name="camera" size={14} color="#fff" />
+              </View>
+            </Avatar>
+          </View>
+          <Text style={styles.userName}>{user?.name || "User Name"}</Text>
           <Text style={styles.userEmail}>
-            {user?.email || "aryan.sharma@gmail.com"}
+            {user?.email || "user@example.com"}
           </Text>
         </View>
 
@@ -300,13 +325,13 @@ export default function Profile() {
         onClose={() => setAlertVisible(false)}
       />
       {/* Half-floating edit sheet */}
-      <Modal visible={editSheetVisible} transparent animationType="fade">
+      <Modal visible={editSheetVisible} transparent animationType="slide">
         <View style={styles.sheetOverlay}>
           <TouchableWithoutFeedback onPress={() => setEditSheetVisible(false)}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
 
-          <View style={[styles.sheet, { height: EDIT_SHEET_HEIGHT }]}>
+          <View style={[styles.sheet, { height: EDIT_SHEET_HEIGHT + 60 }]}>
             <View style={styles.sheetHandleWrap}>
               <View style={styles.sheetHandle} />
             </View>
@@ -325,6 +350,23 @@ export default function Profile() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.sheetScroll}
             >
+              {/* Profile Pic Edit in Modal */}
+              <View style={styles.sheetAvatarSection}>
+                <TouchableOpacity 
+                   style={styles.sheetAvatarWrapper}
+                   onPress={() => setImageSourceVisible(true)}
+                >
+                  <Image 
+                    source={{ uri: selectedImage || user?.profile_pic || 'https://via.placeholder.com/150' }} 
+                    style={styles.sheetAvatar}
+                  />
+                  <View style={styles.avatarEditBadge}>
+                    <Ionicons name="camera" size={12} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+                <Text style={styles.sheetAvatarHint}>Tap to change photo</Text>
+              </View>
+
               <Text style={styles.sheetLabel}>Full Name</Text>
               <View style={styles.sheetInputContainer}>
                 <TextInput
@@ -371,7 +413,10 @@ export default function Profile() {
               <View style={styles.sheetActions}>
                 <TouchableOpacity
                   style={styles.sheetSecondaryBtn}
-                  onPress={() => setEditSheetVisible(false)}
+                  onPress={() => {
+                    setEditSheetVisible(false);
+                    setSelectedImage(null);
+                  }}
                 >
                   <Text style={styles.sheetSecondaryText}>Cancel</Text>
                 </TouchableOpacity>
@@ -388,16 +433,53 @@ export default function Profile() {
                 </TouchableOpacity>
               </View>
 
-              <View style={{ height: 6 }} />
+              <View style={{ height: 30 }} />
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* Advanced Image Source Modal */}
+      <Modal visible={imageSourceVisible} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => setImageSourceVisible(false)}>
+          <View style={styles.imageModalOverlay}>
+            <View style={styles.imageSourceCard}>
+              <Text style={styles.imageSourceTitle}>Update Profile Photo</Text>
+              <TouchableOpacity 
+                style={styles.imageSourceOption}
+                onPress={() => pickImage(true)}
+              >
+                <View style={[styles.imageSourceIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                  <Ionicons name="camera" size={24} color={COLORS.primary} />
+                </View>
+                <Text style={styles.imageSourceText}>Take Photo</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.imageSourceOption}
+                onPress={() => pickImage(false)}
+              >
+                <View style={[styles.imageSourceIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                  <Ionicons name="images" size={24} color="#10b981" />
+                </View>
+                <Text style={styles.imageSourceText}>Choose from Gallery</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.imageSourceOption, { borderBottomWidth: 0, marginTop: 10 }]}
+                onPress={() => setImageSourceVisible(false)}
+              >
+                <Text style={[styles.imageSourceText, { color: COLORS.textMuted, width: '100%', textAlign: 'center' }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     paddingTop: 60,
@@ -609,4 +691,90 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sheetPrimaryText: { color: "#fff", fontSize: 14, fontWeight: "900" },
+  sheetAvatarSection: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  sheetAvatarWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+    padding: 3,
+    position: 'relative',
+  },
+  sheetAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: COLORS.primary,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.background,
+  },
+  sheetAvatarHint: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  imageSourceCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: COLORS.surface,
+    borderRadius: 28,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  imageSourceTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: COLORS.text,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  imageSourceOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  imageSourceIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  imageSourceText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  avatarWrapper: {
+    padding: 4,
+    borderRadius: 70,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
 });

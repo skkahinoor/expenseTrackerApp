@@ -1,9 +1,10 @@
-import { COLORS } from "@/constants/theme";
+import { COLORS as THEME_COLORS } from "@/constants/theme";
 import Avatar from "@/components/Avatar";
+import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { useBanks } from "@/context/BankContext";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     Dimensions,
     Modal,
@@ -21,6 +22,7 @@ import {
 export default function Settings() {
   const { user, fullData, token, refreshFullData, updateSettings } = useAuth();
   const { banks, refresh: refreshBanks } = useBanks();
+  const { colors: COLORS, theme } = useTheme();
   const { height } = Dimensions.get("window");
   const EDIT_SHEET_HEIGHT = Math.min(
     680,
@@ -90,7 +92,9 @@ export default function Settings() {
       await updateSettings({
         salary: parsedSalary,
         savingGoal: parsedSavingGoal,
+        saving_goal: parsedSavingGoal, // redundancy
         fixedExpenses: parsedFixedExpenses,
+        fixed_expenses: parsedFixedExpenses, // redundancy
         salaryBankId: salaryBankId,
         salary_bank_id: salaryBankId, // redundancy
         creditSalary: budgetForm.creditNow,
@@ -110,10 +114,12 @@ export default function Settings() {
     }
   };
 
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   return (
     <View style={styles.container}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         translucent
         backgroundColor="transparent"
       />
@@ -225,7 +231,7 @@ export default function Settings() {
             <Switch
               value={notif80}
               onValueChange={setNotif80}
-              trackColor={{ false: "#334155", true: "#3b82f6" }}
+              trackColor={{ false: COLORS.border, true: COLORS.primary }}
               thumbColor="#fff"
             />
           </View>
@@ -241,7 +247,7 @@ export default function Settings() {
             <Switch
               value={notif100}
               onValueChange={setNotif100}
-              trackColor={{ false: "#334155", true: "#3b82f6" }}
+              trackColor={{ false: COLORS.border, true: COLORS.primary }}
               thumbColor="#fff"
             />
           </View>
@@ -257,7 +263,7 @@ export default function Settings() {
             <Switch
               value={notifSummary}
               onValueChange={setNotifSummary}
-              trackColor={{ false: "#334155", true: "#3b82f6" }}
+              trackColor={{ false: COLORS.border, true: COLORS.primary }}
               thumbColor="#fff"
             />
           </View>
@@ -273,7 +279,7 @@ export default function Settings() {
             <Switch
               value={notifSmart}
               onValueChange={setNotifSmart}
-              trackColor={{ false: "#334155", true: "#3b82f6" }}
+              trackColor={{ false: COLORS.border, true: COLORS.primary }}
               thumbColor="#fff"
             />
           </View>
@@ -403,7 +409,7 @@ export default function Settings() {
                     onValueChange={(v) =>
                       setBudgetForm({ ...budgetForm, creditNow: v })
                     }
-                    trackColor={{ false: "#334155", true: "#3b82f6" }}
+                    trackColor={{ false: COLORS.border, true: COLORS.primary }}
                     thumbColor="#fff"
                   />
                 </View>
@@ -590,7 +596,7 @@ export default function Settings() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     paddingTop: 60,

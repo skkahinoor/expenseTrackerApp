@@ -2,12 +2,15 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { BankProvider } from "@/context/BankContext";
 import { ExpenseProvider } from "@/context/ExpenseContext";
 import { TodoProvider } from "@/context/TodoContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, StatusBar } from "react-native";
 
 function RootLayoutNav() {
   const { token, isLoading } = useAuth();
+  const { colors: COLORS, theme } = useTheme();
   const segments = useSegments();
   const router = useRouter();
 
@@ -32,10 +35,11 @@ function RootLayoutNav() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#0f172a",
+          backgroundColor: COLORS.background,
         }}
       >
-        <ActivityIndicator size="large" color="#6366f1" />
+        <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
@@ -58,7 +62,9 @@ export default function RootLayout() {
         <BankProvider>
           <ExpenseProvider>
             <TodoProvider>
-              <RootLayoutNav />
+              <ThemeProvider>
+                <RootLayoutNav />
+              </ThemeProvider>
             </TodoProvider>
           </ExpenseProvider>
         </BankProvider>

@@ -1,11 +1,12 @@
-import { COLORS } from "@/constants/theme";
+import { COLORS as THEME_COLORS } from "@/constants/theme";
 import Avatar from "@/components/Avatar";
+import { useTheme } from "@/context/ThemeContext";
 import CustomAlert from "@/components/CustomAlert";
 import { useAuth } from "@/context/AuthContext";
 import { Bank, useBanks } from "@/context/BankContext";
 import { useExpenses } from "@/context/ExpenseContext";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -44,6 +45,8 @@ export default function BanksScreen() {
   } = useBanks();
   const { addTransfer } = useExpenses();
   const { refreshFullData, user } = useAuth();
+  const { theme, colors: COLORS } = useTheme();
+  const isDark = theme === "dark";
 
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<"banks" | "cards">("banks");
@@ -393,8 +396,9 @@ export default function BanksScreen() {
   };
 
   const isReadOnly = !editMode && editingId !== null;
+  const style = useMemo(() => createStyles(COLORS), [COLORS]);
   const inputContainerStyle = [
-    styles.modalInputContainer,
+    style.modalInputContainer,
     isReadOnly && {
       backgroundColor: "transparent",
       borderWidth: 0,
@@ -404,9 +408,12 @@ export default function BanksScreen() {
     },
   ] as any;
   const inputStyle = [
-    styles.modalInput,
+    style.modalInput,
     isReadOnly && { fontWeight: "900", fontSize: 20, color: COLORS.text },
   ] as any;
+
+  // We need to use styles from useMemo instead of external styles constant later
+  const styles = style; 
 
   return (
     <View style={styles.container}>
@@ -1351,7 +1358,7 @@ export default function BanksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   tabBar: {
     flexDirection: "row",

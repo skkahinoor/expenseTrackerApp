@@ -18,6 +18,8 @@ export interface User {
   fixedExpenses: number;
   notificationsEnabled: boolean;
   salaryBankId: number;
+  phone_number?: string;
+  address?: string;
 }
 
 export interface FullData {
@@ -33,7 +35,6 @@ export interface FullData {
   };
   user: User;
 }
-
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -41,11 +42,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
-  updateProfile: (
-    name: string,
-    phoneNumber?: string,
-    address?: string,
-  ) => Promise<void>;
+  updateProfile: (data: any) => Promise<void>;
+  uploadProfilePic: (uri: string) => Promise<void>;
   fullData: FullData | null;
   refreshFullData: () => Promise<void>;
   updateSettings: (data: any) => Promise<void>;
@@ -178,11 +176,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await login(email, password);
   };
 
-  const updateProfile = async (
-    name: string,
-    phoneNumber?: string,
-    address?: string,
-  ) => {
+  const updateProfile = async (data: any) => {
     if (!token) throw new Error("Not authenticated");
     const response = await fetch(`${API_BASE}/user/profile`, {
       method: "PUT",
@@ -191,12 +185,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ name, phone_number: phoneNumber, address }),
+      body: JSON.stringify({
+        ...data,
+        phone_number: data.phone_number || data.phoneNumber,
+        address: data.address,
+      }),
     });
 
     if (!response.ok) {
       const err = await response.json();
       throw new Error(err.message || "Failed to update profile");
+    }
+    await refreshUser();
+  };
+
+  const uploadProfilePic = async (uri: string) => {
+    if (!token) throw new Error("Not authenticated");
+    const formData = new FormData();
+    formData.append("profile_pic", {
+      uri,
+      name: "profile.jpg",
+      type: "image/jpeg",
+    } as any);
+
+    const res = await fetch(`${API_BASE}/user/profile-pic`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to upload photo");
     }
     await refreshUser();
   };
@@ -274,7 +297,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider
+        <AuthContext.Provider
       value={{
         user,
         token,
@@ -285,6 +308,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         register,
         logout,
         updateProfile,
+        uploadProfilePic,
         updateSettings,
         resetData,
         deleteAccount,

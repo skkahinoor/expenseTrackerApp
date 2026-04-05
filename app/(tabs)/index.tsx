@@ -1,5 +1,6 @@
-import { COLORS } from "@/constants/theme";
+import { COLORS as THEME_COLORS } from "@/constants/theme";
 import Avatar from "@/components/Avatar";
+import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { useBanks } from "@/context/BankContext";
 import { useExpenses } from "@/context/ExpenseContext";
@@ -29,6 +30,8 @@ export default function Dashboard() {
     refresh: refreshExp,
   } = useExpenses();
   const { banks, isLoading: bankLoading, refresh: refreshBanks } = useBanks();
+  const { theme, toggleTheme, colors: COLORS } = useTheme();
+  const isDark = theme === "dark";
   const router = useRouter();
 
   const settings: any = fullData?.settings || fullData?.user || user || {};
@@ -87,10 +90,12 @@ export default function Dashboard() {
       .slice(0, 5);
   }, [expenses]);
 
+  const styles = useMemo(() => createStyles(COLORS, theme), [COLORS, theme]);
+
   return (
     <View style={styles.container}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         translucent
         backgroundColor="transparent"
       />
@@ -105,6 +110,16 @@ export default function Dashboard() {
           </Text>
         </View>
         <View style={styles.headerIcons}>
+          <TouchableOpacity 
+            style={[styles.themeBtn, { backgroundColor: theme === 'dark' ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }]} 
+            onPress={toggleTheme}
+          >
+            <Ionicons 
+              name={theme === 'dark' ? "sunny-sharp" : "moon-sharp"} 
+              size={20} 
+              color={theme === 'dark' ? COLORS.accent : COLORS.primary} 
+            />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.bellIcon}>
             <Ionicons name="notifications" size={20} color={COLORS.accent} />
             <View style={styles.pingBadge} />
@@ -126,7 +141,7 @@ export default function Dashboard() {
       >
         {/* Global Variable Pool Card */}
         <View style={styles.poolCard}>
-          <BlurView intensity={20} tint="dark" style={styles.poolInner}>
+          <BlurView intensity={20} tint={theme === 'dark' ? 'dark' : 'light'} style={styles.poolInner}>
             <View style={styles.poolBadge}>
               <View style={styles.poolDot} />
               <Text style={styles.poolBadgeText}>VARIABLE POOL</Text>
@@ -156,7 +171,7 @@ export default function Dashboard() {
             </View>
 
             <View style={styles.splitLimitRow}>
-              <View style={[styles.limitBox, { backgroundColor: "#1e293b" }]}>
+              <View style={[styles.limitBox, { backgroundColor: theme === 'dark' ? "#1e293b" : "rgba(0,0,0,0.05)" }]}>
                 <Text style={styles.limitLabel}>SAFE DAILY</Text>
                 <Text style={styles.limitValue}>
                   ₹{safeDailyLimit.toFixed(0)}
@@ -342,7 +357,7 @@ export default function Dashboard() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any, theme: string) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { paddingHorizontal: 20, paddingTop: 10 },
   header: {
@@ -372,6 +387,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  themeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   pingBadge: {
     position: "absolute",
     top: 12,
@@ -393,11 +415,11 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: "#fff", fontSize: 14, fontWeight: "800" },
   poolCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    backgroundColor: theme === 'dark' ? "rgba(15, 23, 42, 0.5)" : "rgba(0, 0, 0, 0.03)",
     borderRadius: 32,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.05)",
+    borderColor: theme === 'dark' ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.05)",
     marginBottom: 25,
   },
   poolInner: { padding: 24 },
@@ -446,7 +468,7 @@ const styles = StyleSheet.create({
   progressValue: { fontSize: 12, fontWeight: "800", color: COLORS.primary },
   progressBarBg: {
     height: 8,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme === 'dark' ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
     borderRadius: 4,
     overflow: "hidden",
   },
